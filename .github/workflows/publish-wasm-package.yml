@@ -1,0 +1,91 @@
+name: Publish Wasm Package
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-wasm-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.15
+
+      - name: Compute package metadata
+        shell: bash
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          package_scope="@${owner}"
+          package_name="${package_scope}/${repo_name}"
+          package_version="5.3.$(date -u +%Y%m%d%H%M%S)"
+          repository_url="git+https://github.com/${GITHUB_REPOSITORY}.git"
+          homepage_url="https://github.com/${GITHUB_REPOSITORY}"
+          echo "PACKAGE_SCOPE=${package_scope}" >> "${GITHUB_ENV}"
+          echo "PACKAGE_NAME=${package_name}" >> "${GITHUB_ENV}"
+          echo "PACKAGE_VERSION=${package_version}" >> "${GITHUB_ENV}"
+          echo "REPOSITORY_URL=${repository_url}" >> "${GITHUB_ENV}"
+          echo "HOMEPAGE_URL=${homepage_url}" >> "${GITHUB_ENV}"
+
+      - name: Configure wasm build
+        env:
+          EM_CACHE: ${{ github.workspace }}/build/emscripten-cache
+        run: |
+          emcmake cmake -S . -B build/wasm-node \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_WASM_BINDINGS=ON
+
+      - name: Build wasm package
+        env:
+          EM_CACHE: ${{ github.workspace }}/build/emscripten-cache
+        run: cmake --build build/wasm-node --target datasketches_hll
+
+      - name: Prepare npm package
+        run: |
+          node scripts/create_npm_package.mjs \
+            --module-dir build/wasm-node/wasm \
+            --out-dir build/npm-package \
+            --package-name "${PACKAGE_NAME}" \
+            --package-version "${PACKAGE_VERSION}" \
+            --repository-url "${REPOSITORY_URL}" \
+            --homepage-url "${HOMEPAGE_URL}"
+
+      - name: Configure npm auth
+        shell: bash
+        run: |
+          cat > build/npm-package/.npmrc <<EOF
+          ${PACKAGE_SCOPE}:registry=https://npm.pkg.github.com
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          always-auth=true
+          EOF
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish package
+        working-directory: build/npm-package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --registry=https://npm.pkg.github.com
