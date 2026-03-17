@@ -47,7 +47,8 @@ const packageJson = {
   },
   homepage: homepageUrl,
   publishConfig: {
-    registry: "https://npm.pkg.github.com",
+    access: "public",
+    registry: "https://registry.npmjs.org",
   },
   main: "datasketches_hll.js",
   types: "datasketches_hll.d.ts",
