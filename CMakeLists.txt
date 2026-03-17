@@ -74,6 +74,9 @@ if (BUILD_TESTS)
   enable_testing()
 endif()
 
+option(BUILD_EXAMPLES "Build example programs" ON)
+option(BUILD_WASM_BINDINGS "Build Emscripten/Node.js bindings" OFF)
+
 option(COVERAGE "Enable code coverage reporting (g++/clang only)" OFF)
 if(COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   set(CMAKE_BUILD_TYPE "Debug" FORCE)
@@ -120,6 +123,17 @@ add_subdirectory(count)
 add_subdirectory(density)
 add_subdirectory(tdigest)
 add_subdirectory(filters)
+
+if (BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+if (BUILD_WASM_BINDINGS)
+  if (NOT EMSCRIPTEN)
+    message(FATAL_ERROR "BUILD_WASM_BINDINGS requires configuring with the Emscripten toolchain")
+  endif()
+  add_subdirectory(wasm)
+endif()
 
 if (WITH_PYTHON)
   add_subdirectory(python)

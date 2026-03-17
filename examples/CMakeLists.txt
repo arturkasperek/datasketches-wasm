@@ -1,0 +1,2 @@
+add_executable(hll_basic_example hll_basic_example.cpp)
+target_link_libraries(hll_basic_example PRIVATE hll)
