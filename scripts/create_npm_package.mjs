@@ -1,5 +1,6 @@
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 function parseArgs(argv) {
   const result = {};
@@ -33,6 +34,12 @@ for (const fileName of ["datasketches_hll.js", "datasketches_hll.wasm", "dataske
   cpSync(path.join(moduleDir, fileName), path.join(outDir, fileName));
 }
 
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const npmFilesDir = path.join(scriptDir, "npm-package-files");
+for (const fileName of ["index.js", "index.d.ts", "wasm-path.js", "wasm-path.d.ts"]) {
+  cpSync(path.join(npmFilesDir, fileName), path.join(outDir, fileName));
+}
+
 cpSync(path.resolve("LICENSE"), path.join(outDir, "LICENSE"));
 cpSync(path.resolve("README.md"), path.join(outDir, "README.md"));
 
@@ -50,9 +57,13 @@ const packageJson = {
     access: "public",
     registry: "https://registry.npmjs.org",
   },
-  main: "datasketches_hll.js",
-  types: "datasketches_hll.d.ts",
+  main: "index.js",
+  types: "index.d.ts",
   files: [
+    "index.js",
+    "index.d.ts",
+    "wasm-path.js",
+    "wasm-path.d.ts",
     "datasketches_hll.js",
     "datasketches_hll.wasm",
     "datasketches_hll.d.ts",
@@ -72,9 +83,14 @@ const packageJson = {
   },
   exports: {
     ".": {
-      types: "./datasketches_hll.d.ts",
-      require: "./datasketches_hll.js",
-      default: "./datasketches_hll.js",
+      types: "./index.d.ts",
+      require: "./index.js",
+      default: "./index.js",
+    },
+    "./wasm-path": {
+      types: "./wasm-path.d.ts",
+      require: "./wasm-path.js",
+      default: "./wasm-path.js",
     },
   },
 };
@@ -86,6 +102,8 @@ const readme = readFileSync(readmePath, "utf8");
 const packageReadme = `# ${packageName}
 
 Prebuilt Node.js WebAssembly bindings for Apache DataSketches HLL.
+
+Works with Next.js and other bundlers — \`locateFile\` is auto-injected when not provided.
 
 ## Usage
 
